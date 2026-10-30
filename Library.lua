@@ -2327,6 +2327,7 @@ do
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
+            Active = true;
             ZIndex = 6;
             Parent = DropdownOuter;
         });
@@ -2351,7 +2352,7 @@ do
             Position = UDim2.new(1, -16, 0.5, 0);
             Size = UDim2.new(0, 12, 0, 12);
             Image = 'http://www.roblox.com/asset/?id=6282522798';
-            Active = false;
+            Active = true;
             ZIndex = 8;
             Parent = DropdownInner;
         });
@@ -2363,7 +2364,7 @@ do
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
             TextWrapped = true;
-            Active = false;
+            Active = true;
             ZIndex = 7;
             Parent = DropdownInner;
         });
@@ -2646,28 +2647,50 @@ do
             Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
         end;
 
-        DropdownOuter.InputBegan:Connect(function(Input)
-            if IsActivateInput(Input) and not Library:MouseIsOverOpenedFrame() then
-                if ListOuter.Visible then
-                    Dropdown:CloseDropdown();
-                else
-                    Dropdown:OpenDropdown();
-                end;
-            end;
-        end);
+        local function ToggleDropdownOpen(Input)
+            if not IsActivateInput(Input) then
+                return;
+            end
+            -- Allow toggle even if this dropdown's list is open; block only if over a *different* opened frame
+            if Library:MouseIsOverOpenedFrame() and not ListOuter.Visible then
+                -- still allow if pointer is over this control
+                local abs = DropdownOuter.AbsolutePosition
+                local siz = DropdownOuter.AbsoluteSize
+                local mx, my = GetPointerPos(Input)
+                if not (mx >= abs.X and mx <= abs.X + siz.X and my >= abs.Y and my <= abs.Y + siz.Y) then
+                    return;
+                end
+            end
+            if ListOuter.Visible then
+                Dropdown:CloseDropdown();
+            else
+                Dropdown:OpenDropdown();
+            end
+        end
+        DropdownOuter.InputBegan:Connect(ToggleDropdownOpen);
+        DropdownInner.InputBegan:Connect(ToggleDropdownOpen);
+        ItemList.InputBegan:Connect(ToggleDropdownOpen);
+        DropdownArrow.InputBegan:Connect(ToggleDropdownOpen);
 
-        InputService.InputBegan:Connect(function(Input)
-            if IsActivateInput(Input) then
-                local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
-
-                local mx, my = GetPointerPos(Input);
-                if mx < AbsPos.X or mx > AbsPos.X + AbsSize.X
-                    or my < (AbsPos.Y - 20 - 1) or my > AbsPos.Y + AbsSize.Y then
-
-                    Dropdown:CloseDropdown();
-                end;
-            end;
-        end);
+        Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
+            if not IsActivateInput(Input) then
+                return;
+            end
+            if not ListOuter.Visible then
+                return;
+            end
+            -- don't close on the same click that interacts with the control or the list
+            local mx, my = GetPointerPos(Input)
+            local oAbs, oSiz = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
+            if mx >= oAbs.X and mx <= oAbs.X + oSiz.X and my >= oAbs.Y and my <= oAbs.Y + oSiz.Y then
+                return;
+            end
+            local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
+            if mx < AbsPos.X or mx > AbsPos.X + AbsSize.X
+                or my < AbsPos.Y or my > AbsPos.Y + AbsSize.Y then
+                Dropdown:CloseDropdown();
+            end
+        end));
 
         Dropdown:BuildDropdownList();
         Dropdown:Display();

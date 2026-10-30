@@ -31,11 +31,14 @@ local function GetPointerPos(Input)
 end
 
 local function IsPointerDown()
-    if IsPointerDown() then
+    if InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
         return true
     end
-    for _, touch in ipairs(InputService:GetTouches()) do
-        if touch then return true end
+    local ok, touches = pcall(function()
+        return InputService:GetTouches()
+    end)
+    if ok and touches and #touches > 0 then
+        return true
     end
     return false
 end
@@ -199,51 +202,75 @@ end;
 function Library:MakeDraggable(Instance, Cutoff)
     Instance.Active = true;
 
+    local dragging = false;
+    local dragInput = nil;
+    local dragStart = nil;
+    local startPos = nil;
+    local cutoff = Cutoff or 40;
+
+    local function update(input)
+        local delta = input.Position - dragStart;
+        Instance.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        );
+    end
+
     Instance.InputBegan:Connect(function(Input)
         if not IsActivateInput(Input) then
             return;
         end
 
-        local px, py = GetPointerPos(Input);
-        local ObjPos = Vector2.new(
-            px - Instance.AbsolutePosition.X,
-            py - Instance.AbsolutePosition.Y
-        );
-
-        if ObjPos.Y > (Cutoff or 40) then
+        local relY = Input.Position.Y - Instance.AbsolutePosition.Y;
+        if relY > cutoff then
             return;
-        end;
+        end
 
-        local dragging = true;
-        local ended;
-        ended = Input.Changed:Connect(function()
+        dragging = true;
+        dragInput = Input;
+        dragStart = Input.Position;
+        startPos = Instance.Position;
+
+        Input.Changed:Connect(function()
             if Input.UserInputState == Enum.UserInputState.End then
                 dragging = false;
+                dragInput = nil;
             end
         end)
+    end)
 
-        while dragging and ScreenGui.Parent do
-            local cx, cy = GetPointerPos(Input);
-            Instance.Position = UDim2.new(
-                0,
-                cx - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
-                0,
-                cy - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
-            );
-            RenderStepped:Wait();
-            if not IsPointerDown() and Input.UserInputState == Enum.UserInputState.End then
-                break;
+    Instance.InputChanged:Connect(function(Input)
+        if Input == dragInput and dragging then
+            update(Input);
+        elseif dragging and IsActivateInput(Input) then
+            -- mobile sometimes fires new InputChanged with touch move
+            if dragStart then
+                update(Input);
             end
-            -- stop when primary pointer released
-            if not IsPointerDown() then
-                break;
-            end
-        end
-
-        if ended then
-            pcall(function() ended:Disconnect() end)
         end
     end)
+
+    Library:GiveSignal(InputService.InputChanged:Connect(function(Input)
+        if not dragging then
+            return;
+        end
+        if Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch then
+            if dragInput == nil or Input == dragInput or Input.UserInputType == Enum.UserInputType.MouseMovement then
+                if dragStart and startPos then
+                    update(Input);
+                end
+            end
+        end
+    end))
+
+    Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
+        if IsActivateInput(Input) and dragging then
+            dragging = false;
+            dragInput = nil;
+        end
+    end))
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
@@ -3031,6 +3058,7 @@ function Library:CreateWindow(...)
         Position = Config.Position,
         Size = Config.Size,
         Visible = false;
+        Active = true;
         ZIndex = 1;
         Parent = ScreenGui;
     });

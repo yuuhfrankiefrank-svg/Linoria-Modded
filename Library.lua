@@ -2364,9 +2364,22 @@ do
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
             TextWrapped = true;
-            Active = true;
+            Active = false;
             ZIndex = 7;
             Parent = DropdownInner;
+        });
+
+        -- Full-size hit target (TextButton.Activated works reliably on mobile + PC)
+        local DropdownHit = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Text = '';
+            TextTransparency = 1;
+            AutoButtonColor = false;
+            Size = UDim2.new(1, 0, 1, 0);
+            Position = UDim2.new(0, 0, 0, 0);
+            Active = true;
+            ZIndex = 9;
+            Parent = DropdownOuter;
         });
 
         Library:OnHighlight(DropdownOuter, DropdownOuter,
@@ -2495,13 +2508,16 @@ do
 
                 Count = Count + 1;
 
-                local Button = Library:Create('Frame', {
+                local Button = Library:Create('TextButton', {
                     BackgroundColor3 = Library.MainColor;
                     BorderColor3 = Library.OutlineColor;
                     BorderMode = Enum.BorderMode.Middle;
                     Size = UDim2.new(1, -1, 0, 20);
                     ZIndex = 23;
-                    Active = true,
+                    Active = true;
+                    Text = '';
+                    TextTransparency = 1;
+                    AutoButtonColor = false;
                     Parent = Scrolling;
                 });
 
@@ -2584,6 +2600,11 @@ do
                 end
                 ButtonLabel.InputBegan:Connect(OnDropdownItem);
                 Button.InputBegan:Connect(OnDropdownItem);
+                if typeof(Button.Activated) == 'RBXScriptSignal' then
+                    Button.Activated:Connect(function()
+                        OnDropdownItem({ UserInputType = Enum.UserInputType.MouseButton1 })
+                    end)
+                end
 
                 Table:UpdateButton();
                 Dropdown:Display();
@@ -2606,6 +2627,17 @@ do
         end;
 
         function Dropdown:OpenDropdown()
+            -- refresh position (AbsolutePosition changes on mobile scroll)
+            pcall(function()
+                ListOuter.Position = UDim2.fromOffset(
+                    DropdownOuter.AbsolutePosition.X,
+                    DropdownOuter.AbsolutePosition.Y + DropdownOuter.AbsoluteSize.Y + 1
+                );
+                ListOuter.Size = UDim2.fromOffset(
+                    DropdownOuter.AbsoluteSize.X,
+                    ListOuter.Size.Y.Offset > 0 and ListOuter.Size.Y.Offset or (MAX_DROPDOWN_ITEMS * 20 + 2)
+                );
+            end)
             ListOuter.Visible = true;
             Library.OpenedFrames[ListOuter] = true;
             DropdownArrow.Rotation = 180;
@@ -2647,30 +2679,26 @@ do
             Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
         end;
 
-        local function ToggleDropdownOpen(Input)
-            if not IsActivateInput(Input) then
-                return;
-            end
-            -- Allow toggle even if this dropdown's list is open; block only if over a *different* opened frame
-            if Library:MouseIsOverOpenedFrame() and not ListOuter.Visible then
-                -- still allow if pointer is over this control
-                local abs = DropdownOuter.AbsolutePosition
-                local siz = DropdownOuter.AbsoluteSize
-                local mx, my = GetPointerPos(Input)
-                if not (mx >= abs.X and mx <= abs.X + siz.X and my >= abs.Y and my <= abs.Y + siz.Y) then
-                    return;
-                end
-            end
+        local _ddBusy = false
+        local function ToggleDropdownOpen()
+            if _ddBusy then return end
+            _ddBusy = true
             if ListOuter.Visible then
                 Dropdown:CloseDropdown();
             else
                 Dropdown:OpenDropdown();
             end
+            task.delay(0.15, function()
+                _ddBusy = false
+            end)
         end
-        DropdownOuter.InputBegan:Connect(ToggleDropdownOpen);
-        DropdownInner.InputBegan:Connect(ToggleDropdownOpen);
-        ItemList.InputBegan:Connect(ToggleDropdownOpen);
-        DropdownArrow.InputBegan:Connect(ToggleDropdownOpen);
+
+        DropdownHit.Activated:Connect(ToggleDropdownOpen)
+        DropdownHit.InputBegan:Connect(function(Input)
+            if IsActivateInput(Input) then
+                ToggleDropdownOpen()
+            end
+        end)
 
         Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
             if not IsActivateInput(Input) then
@@ -2679,17 +2707,22 @@ do
             if not ListOuter.Visible then
                 return;
             end
-            -- don't close on the same click that interacts with the control or the list
-            local mx, my = GetPointerPos(Input)
-            local oAbs, oSiz = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
-            if mx >= oAbs.X and mx <= oAbs.X + oSiz.X and my >= oAbs.Y and my <= oAbs.Y + oSiz.Y then
-                return;
-            end
-            local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
-            if mx < AbsPos.X or mx > AbsPos.X + AbsSize.X
-                or my < AbsPos.Y or my > AbsPos.Y + AbsSize.Y then
-                Dropdown:CloseDropdown();
-            end
+            -- defer so the open click doesn't immediately close
+            task.defer(function()
+                if not ListOuter.Visible then
+                    return;
+                end
+                local mx, my = GetPointerPos(Input)
+                local oAbs, oSiz = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
+                if mx >= oAbs.X and mx <= oAbs.X + oSiz.X and my >= oAbs.Y and my <= oAbs.Y + oSiz.Y then
+                    return;
+                end
+                local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
+                if mx < AbsPos.X or mx > AbsPos.X + AbsSize.X
+                    or my < AbsPos.Y or my > AbsPos.Y + AbsSize.Y then
+                    Dropdown:CloseDropdown();
+                end
+            end)
         end));
 
         Dropdown:BuildDropdownList();

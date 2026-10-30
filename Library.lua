@@ -18,14 +18,15 @@ local function IsActivateInput(Input)
 end
 
 local function GetPointerPos(Input)
-    if Input and Input.Position then
-        return Input.Position.X, Input.Position.Y
-    end
+    -- Prefer live mouse/touch location (updates during drag on mobile + PC)
     local ok, loc = pcall(function()
         return InputService:GetMouseLocation()
     end)
     if ok and loc then
         return loc.X, loc.Y
+    end
+    if Input and Input.Position then
+        return Input.Position.X, Input.Position.Y
     end
     return Mouse.X, Mouse.Y
 end
@@ -526,6 +527,7 @@ do
             BorderColor3 = Library:GetDarkerColor(ColorPicker.Value);
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(0, 28, 0, 14);
+            Active = true;
             ZIndex = 6;
             Parent = ToggleLabel;
         });
@@ -597,6 +599,7 @@ do
         local SatVibMap = Library:Create('ImageLabel', {
             BorderSizePixel = 0;
             Size = UDim2.new(1, 0, 1, 0);
+            Active = true;
             ZIndex = 18;
             Image = 'rbxassetid://4155801252';
             Parent = SatVibMapInner;
@@ -633,6 +636,7 @@ do
             BackgroundColor3 = Color3.new(1, 1, 1);
             BorderSizePixel = 0;
             Size = UDim2.new(1, 0, 1, 0);
+            Active = true;
             ZIndex = 18;
             Parent = HueSelectorOuter;
         });
@@ -718,7 +722,8 @@ do
                 BorderColor3 = Library.OutlineColor;
                 BorderMode = Enum.BorderMode.Inset;
                 Size = UDim2.new(1, 0, 1, 0);
-                ZIndex = 19;
+                Active = true;
+            ZIndex = 19;
                 Parent = TransparencyBoxOuter;
             });
 
@@ -988,13 +993,14 @@ do
         SatVibMap.InputBegan:Connect(function(Input)
             if IsActivateInput(Input) then
                 while IsPointerDown() do
+                    local px, py = GetPointerPos(nil);
                     local MinX = SatVibMap.AbsolutePosition.X;
                     local MaxX = MinX + SatVibMap.AbsoluteSize.X;
-                    local MouseX = math.clamp(select(1, GetPointerPos(Input)), MinX, MaxX);
+                    local MouseX = math.clamp(px, MinX, MaxX);
 
                     local MinY = SatVibMap.AbsolutePosition.Y;
                     local MaxY = MinY + SatVibMap.AbsoluteSize.Y;
-                    local MouseY = math.clamp(Mouse.Y, MinY, MaxY);
+                    local MouseY = math.clamp(py, MinY, MaxY);
 
                     ColorPicker.Sat = (MouseX - MinX) / (MaxX - MinX);
                     ColorPicker.Vib = 1 - ((MouseY - MinY) / (MaxY - MinY));
@@ -1010,9 +1016,10 @@ do
         HueSelectorInner.InputBegan:Connect(function(Input)
             if IsActivateInput(Input) then
                 while IsPointerDown() do
+                    local _, py = GetPointerPos(nil);
                     local MinY = HueSelectorInner.AbsolutePosition.Y;
                     local MaxY = MinY + HueSelectorInner.AbsoluteSize.Y;
-                    local MouseY = math.clamp(Mouse.Y, MinY, MaxY);
+                    local MouseY = math.clamp(py, MinY, MaxY);
 
                     ColorPicker.Hue = ((MouseY - MinY) / (MaxY - MinY));
                     ColorPicker:Display();
@@ -1521,6 +1528,7 @@ do
                 BackgroundColor3 = Color3.new(0, 0, 0);
                 BorderColor3 = Color3.new(0, 0, 0);
                 Size = UDim2.new(1, -4, 0, 20);
+                Active = true;
                 ZIndex = 5;
             });
 
@@ -1537,6 +1545,7 @@ do
                 Size = UDim2.new(1, 0, 1, 0);
                 TextSize = 14;
                 Text = Button.Text;
+                Active = false;
                 ZIndex = 6;
                 Parent = Inner;
             });
@@ -1923,6 +1932,7 @@ do
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
             Size = UDim2.new(0, 13, 0, 13);
+            Active = true;
             ZIndex = 5;
             Parent = Container;
         });
@@ -2015,12 +2025,19 @@ do
             Library:UpdateDependencyBoxes();
         end;
 
-        ToggleRegion.InputBegan:Connect(function(Input)
+
+        local function ToggleClick(Input)
             if IsActivateInput(Input) and not Library:MouseIsOverOpenedFrame() then
-                Toggle:SetValue(not Toggle.Value) -- Why was it not like this from the start?
+                Toggle:SetValue(not Toggle.Value)
                 Library:AttemptSave();
-            end;
-        end);
+            end
+        end
+        ToggleRegion.InputBegan:Connect(ToggleClick)
+        ToggleOuter.InputBegan:Connect(ToggleClick)
+        if ToggleLabel then
+            ToggleLabel.Active = false
+        end
+
 
         if Toggle.Risky then
             Library:RemoveFromRegistry(ToggleLabel)
@@ -2081,6 +2098,7 @@ do
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
             Size = UDim2.new(1, -4, 0, 13);
+            Active = true;
             ZIndex = 5;
             Parent = Container;
         });
@@ -2094,6 +2112,7 @@ do
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
+            Active = true;
             ZIndex = 6;
             Parent = SliderOuter;
         });
@@ -2133,6 +2152,7 @@ do
             Size = UDim2.new(1, 0, 1, 0);
             TextSize = 14;
             Text = 'Infinite';
+            Active = false;
             ZIndex = 9;
             Parent = SliderInner;
         });
@@ -2293,6 +2313,7 @@ do
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
             Size = UDim2.new(1, -4, 0, 20);
+            Active = true;
             ZIndex = 5;
             Parent = Container;
         });
@@ -2330,6 +2351,7 @@ do
             Position = UDim2.new(1, -16, 0.5, 0);
             Size = UDim2.new(0, 12, 0, 12);
             Image = 'http://www.roblox.com/asset/?id=6282522798';
+            Active = false;
             ZIndex = 8;
             Parent = DropdownInner;
         });
@@ -2341,6 +2363,7 @@ do
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
             TextWrapped = true;
+            Active = false;
             ZIndex = 7;
             Parent = DropdownInner;
         });
@@ -2359,6 +2382,7 @@ do
         local ListOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
+            Active = true;
             ZIndex = 20;
             Visible = false;
             Parent = ScreenGui;
@@ -2397,6 +2421,8 @@ do
             BorderSizePixel = 0;
             CanvasSize = UDim2.new(0, 0, 0, 0);
             Size = UDim2.new(1, 0, 1, 0);
+            Active = true;
+            ScrollingEnabled = true;
             ZIndex = 21;
             Parent = ListInner;
 
@@ -2518,44 +2544,45 @@ do
                     Library.RegistryMap[ButtonLabel].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
                 end;
 
-                ButtonLabel.InputBegan:Connect(function(Input)
-                    if IsActivateInput(Input) then
-                        local Try = not Selected;
+                local function OnDropdownItem(Input)
+                    if not IsActivateInput(Input) then
+                        return;
+                    end
+                    local Try = not Selected;
 
-                        if Dropdown:GetActiveValues() == 1 and (not Try) and (not Info.AllowNull) then
+                    if Dropdown:GetActiveValues() == 1 and (not Try) and (not Info.AllowNull) then
+                        return;
+                    end
+
+                    if Info.Multi then
+                        Selected = Try;
+                        if Selected then
+                            Dropdown.Value[Value] = true;
                         else
-                            if Info.Multi then
-                                Selected = Try;
+                            Dropdown.Value[Value] = nil;
+                        end
+                    else
+                        Selected = Try;
+                        if Selected then
+                            Dropdown.Value = Value;
+                        else
+                            Dropdown.Value = nil;
+                        end
+                        for _, OtherButton in next, Buttons do
+                            OtherButton:UpdateButton();
+                        end
+                    end
 
-                                if Selected then
-                                    Dropdown.Value[Value] = true;
-                                else
-                                    Dropdown.Value[Value] = nil;
-                                end;
-                            else
-                                Selected = Try;
+                    Table:UpdateButton();
+                    Dropdown:Display();
 
-                                if Selected then
-                                    Dropdown.Value = Value;
-                                else
-                                    Dropdown.Value = nil;
-                                end;
+                    Library:SafeCallback(Dropdown.Callback, Dropdown.Value);
+                    Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
 
-                                for _, OtherButton in next, Buttons do
-                                    OtherButton:UpdateButton();
-                                end;
-                            end;
-
-                            Table:UpdateButton();
-                            Dropdown:Display();
-
-                            Library:SafeCallback(Dropdown.Callback, Dropdown.Value);
-                            Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
-
-                            Library:AttemptSave();
-                        end;
-                    end;
-                end);
+                    Library:AttemptSave();
+                end
+                ButtonLabel.InputBegan:Connect(OnDropdownItem);
+                Button.InputBegan:Connect(OnDropdownItem);
 
                 Table:UpdateButton();
                 Dropdown:Display();
@@ -3163,6 +3190,7 @@ function Library:CreateWindow(...)
             BackgroundColor3 = Library.BackgroundColor;
             BorderColor3 = Library.OutlineColor;
             Size = UDim2.new(0, TabButtonWidth + 8 + 4, 1, 0);
+            Active = true;
             ZIndex = 1;
             Parent = TabArea;
         });
@@ -3176,6 +3204,7 @@ function Library:CreateWindow(...)
             Position = UDim2.new(0, 0, 0, 0);
             Size = UDim2.new(1, 0, 1, -1);
             Text = Name;
+            Active = false;
             ZIndex = 1;
             Parent = TabButton;
         });
@@ -3444,6 +3473,7 @@ function Library:CreateWindow(...)
                     BackgroundColor3 = Library.MainColor;
                     BorderColor3 = Color3.new(0, 0, 0);
                     Size = UDim2.new(0.5, 0, 1, 0);
+                    Active = true;
                     ZIndex = 6;
                     Parent = TabboxButtons;
                 });
@@ -3457,6 +3487,7 @@ function Library:CreateWindow(...)
                     TextSize = 14;
                     Text = Name;
                     TextXAlignment = Enum.TextXAlignment.Center;
+                    Active = false;
                     ZIndex = 7;
                     Parent = Button;
                 });

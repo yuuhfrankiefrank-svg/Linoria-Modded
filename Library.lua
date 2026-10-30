@@ -2511,7 +2511,6 @@ do
                         for _, OtherButton in next, Buttons do
                             OtherButton:UpdateButton();
                         end
-                        task.defer(function() Dropdown:CloseDropdown() end)
                     end
                     Table:UpdateButton();
                     Dropdown:Display();
@@ -2519,7 +2518,10 @@ do
                     Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
                     Library:AttemptSave();
                 end
-                BindClick(Button, OnDropdownItem);
+                BindClick(Button, function()
+                    Dropdown._ignoreCloseUntil = tick() + 0.35
+                    OnDropdownItem()
+                end);
 
                 Table:UpdateButton();
                 Dropdown:Display();
@@ -2583,7 +2585,7 @@ do
             Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
         end;
 
-        local ignoreCloseUntil = 0
+        Dropdown._ignoreCloseUntil = 0
         local function ToggleDropdownOpen()
             if ListOuter.Visible then
                 Dropdown:CloseDropdown();
@@ -2599,7 +2601,7 @@ do
                     )
                 end)
                 Dropdown:OpenDropdown();
-                ignoreCloseUntil = tick() + 0.4
+                Dropdown._ignoreCloseUntil = tick() + 0.4
             end
         end
         BindClick(DropdownHit, ToggleDropdownOpen)
@@ -2607,7 +2609,7 @@ do
         Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
             if not IsActivateInput(Input) then return end
             if not ListOuter.Visible then return end
-            if tick() < ignoreCloseUntil then return end
+            if tick() < (Dropdown._ignoreCloseUntil or 0) then return end
             local mx, my = GetPointerPos(Input)
             local o = DropdownOuter
             if mx >= o.AbsolutePosition.X and mx <= o.AbsolutePosition.X + o.AbsoluteSize.X

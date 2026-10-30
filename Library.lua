@@ -3774,12 +3774,12 @@ function Library:CreateWindow(...)
             local ToggleOuter, ToggleBtn = CreateMobileButton(
                 'Toggle',
                 'Toggle UI',
-                UDim2.fromOffset(10, 10)
+                UDim2.fromOffset(10, 100)
             )
             local LockOuter, LockBtn = CreateMobileButton(
                 'Lock',
                 'Unlock UI',
-                UDim2.fromOffset(10, 10 + BTN_H + (BTN_GAP - BTN_H))
+                UDim2.fromOffset(10, 100 + BTN_H + (BTN_GAP - BTN_H))
             )
 
             local IsUnlocked = false

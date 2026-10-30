@@ -24,9 +24,13 @@ local function GetPointerPos(Input)
 end
 
 local function IsPointerDown()
-    if IsPointerDown() then return true end
+    if InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+        return true
+    end
     local ok, touches = pcall(function() return InputService:GetTouches() end)
-    if ok and touches and #touches > 0 then return true end
+    if ok and touches and #touches > 0 then
+        return true
+    end
     return false
 end
 
@@ -2173,31 +2177,34 @@ do
         end;
 
         SliderInner.InputBegan:Connect(function(Input)
-            if IsActivateInput(Input) and not Library:MouseIsOverOpenedFrame() then
-                local mPos = select(1, GetPointerPos(Input));
-                local gPos = Fill.Size.X.Offset;
-                local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
+            if not IsActivateInput(Input) or Library:MouseIsOverOpenedFrame() then
+                return
+            end
 
-                while IsPointerDown() do
-                    local nMPos = select(1, GetPointerPos(nil));
-                    local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, Slider.MaxSize);
+            local function applyFromPointer()
+                local px = select(1, GetPointerPos(nil))
+                local trackX = SliderInner.AbsolutePosition.X
+                local trackW = math.max(SliderInner.AbsoluteSize.X, 1)
+                Slider.MaxSize = trackW
+                local nX = math.clamp(px - trackX, 0, trackW)
+                local nValue = Slider:GetValueFromXOffset(nX)
+                local OldValue = Slider.Value
+                Slider.Value = nValue
+                Slider:Display()
+                if nValue ~= OldValue then
+                    Library:SafeCallback(Slider.Callback, Slider.Value)
+                    Library:SafeCallback(Slider.Changed, Slider.Value)
+                end
+            end
 
-                    local nValue = Slider:GetValueFromXOffset(nX);
-                    local OldValue = Slider.Value;
-                    Slider.Value = nValue;
+            applyFromPointer()
 
-                    Slider:Display();
+            while IsPointerDown() do
+                applyFromPointer()
+                RenderStepped:Wait()
+            end
 
-                    if nValue ~= OldValue then
-                        Library:SafeCallback(Slider.Callback, Slider.Value);
-                        Library:SafeCallback(Slider.Changed, Slider.Value);
-                    end;
-
-                    RenderStepped:Wait();
-                end;
-
-                Library:AttemptSave();
-            end;
+            Library:AttemptSave()
         end);
 
         Slider:Display();

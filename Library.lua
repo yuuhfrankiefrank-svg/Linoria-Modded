@@ -2598,13 +2598,10 @@ do
 
                     Library:AttemptSave();
                 end
-                ButtonLabel.InputBegan:Connect(OnDropdownItem);
-                Button.InputBegan:Connect(OnDropdownItem);
-                if typeof(Button.Activated) == 'RBXScriptSignal' then
-                    Button.Activated:Connect(function()
-                        OnDropdownItem({ UserInputType = Enum.UserInputType.MouseButton1 })
-                    end)
-                end
+                -- single path: Activated (mobile + PC)
+                Button.Activated:Connect(function()
+                    OnDropdownItem({ UserInputType = Enum.UserInputType.MouseButton1 })
+                end)
 
                 Table:UpdateButton();
                 Dropdown:Display();
@@ -2679,50 +2676,40 @@ do
             Library:SafeCallback(Dropdown.Changed, Dropdown.Value);
         end;
 
-        local _ddBusy = false
+        local ignoreCloseUntil = 0
         local function ToggleDropdownOpen()
-            if _ddBusy then return end
-            _ddBusy = true
             if ListOuter.Visible then
                 Dropdown:CloseDropdown();
             else
                 Dropdown:OpenDropdown();
+                -- ignore outside-close for this same tap / next moment
+                ignoreCloseUntil = tick() + 0.35
             end
-            task.delay(0.15, function()
-                _ddBusy = false
-            end)
         end
 
+        -- ONE open path only (Activated works on mobile + PC; dual InputBegan caused double-tap)
         DropdownHit.Activated:Connect(ToggleDropdownOpen)
-        DropdownHit.InputBegan:Connect(function(Input)
-            if IsActivateInput(Input) then
-                ToggleDropdownOpen()
-            end
-        end)
 
-        Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
+        Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
             if not IsActivateInput(Input) then
                 return;
             end
             if not ListOuter.Visible then
                 return;
             end
-            -- defer so the open click doesn't immediately close
-            task.defer(function()
-                if not ListOuter.Visible then
-                    return;
-                end
-                local mx, my = GetPointerPos(Input)
-                local oAbs, oSiz = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
-                if mx >= oAbs.X and mx <= oAbs.X + oSiz.X and my >= oAbs.Y and my <= oAbs.Y + oSiz.Y then
-                    return;
-                end
-                local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
-                if mx < AbsPos.X or mx > AbsPos.X + AbsSize.X
-                    or my < AbsPos.Y or my > AbsPos.Y + AbsSize.Y then
-                    Dropdown:CloseDropdown();
-                end
-            end)
+            if tick() < ignoreCloseUntil then
+                return;
+            end
+            local mx, my = GetPointerPos(Input)
+            local oAbs, oSiz = DropdownOuter.AbsolutePosition, DropdownOuter.AbsoluteSize
+            if mx >= oAbs.X and mx <= oAbs.X + oSiz.X and my >= oAbs.Y and my <= oAbs.Y + oSiz.Y then
+                return;
+            end
+            local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
+            if mx < AbsPos.X or mx > AbsPos.X + AbsSize.X
+                or my < AbsPos.Y or my > AbsPos.Y + AbsSize.Y then
+                Dropdown:CloseDropdown();
+            end
         end));
 
         Dropdown:BuildDropdownList();

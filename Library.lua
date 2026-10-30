@@ -3695,56 +3695,154 @@ function Library:CreateWindow(...)
 
     Window.Holder = Outer;
 
-    -- Mobile-only: Toggle UI stacked above Lock UI (top-left, no bar frame)
+    -- Mobile-only: Toggle UI above Lock UI (top-left, styled like Linoria mobile chrome)
     do
         local isMobile = InputService.TouchEnabled == true
 
         if isMobile then
-            local function makeMobileToggle(text, position, defaultOn, callback)
-                local btn = Library:Create('TextButton', {
-                    BackgroundColor3 = defaultOn and Library.AccentColor or Library.BackgroundColor;
-                    BorderColor3 = Library.OutlineColor;
-                    Position = position;
-                    Size = UDim2.fromOffset(100, 28);
-                    Text = text;
-                    Font = Library.Font;
-                    TextSize = 13;
-                    TextColor3 = Library.FontColor;
-                    AutoButtonColor = false;
-                    Active = true;
-                    ZIndex = 100;
-                    Parent = ScreenGui;
-                });
-                Library:AddToRegistry(btn, {
-                    BackgroundColor3 = defaultOn and 'AccentColor' or 'BackgroundColor';
-                    BorderColor3 = 'OutlineColor';
-                    TextColor3 = 'FontColor';
-                });
-                local on = defaultOn
-                BindClick(btn, function()
-                    on = not on
-                    btn.BackgroundColor3 = on and Library.AccentColor or Library.BackgroundColor
-                    local reg = Library.RegistryMap[btn]
-                    if reg then
-                        reg.Properties.BackgroundColor3 = on and 'AccentColor' or 'BackgroundColor'
-                    end
-                    callback(on)
-                end)
-                return btn
+            local BTN_W, BTN_H = 88, 30
+            local BTN_GAP = 40
+
+            local function CreateMobileButton(name, text, startPos)
+                local Outer = Library:Create('Frame', {
+                    Name = name .. 'Outer',
+                    BackgroundColor3 = Library.OutlineColor,
+                    BorderSizePixel = 0,
+                    Position = startPos,
+                    Size = UDim2.fromOffset(BTN_W, BTN_H),
+                    ZIndex = 300,
+                    Parent = ScreenGui,
+                    Active = true,
+                })
+                Library:AddToRegistry(Outer, { BackgroundColor3 = 'OutlineColor' })
+
+                local AccentFrame = Library:Create('Frame', {
+                    Name = name .. 'Accent',
+                    BackgroundColor3 = Library.AccentColor,
+                    BorderSizePixel = 0,
+                    Position = UDim2.fromOffset(1, 1),
+                    Size = UDim2.new(1, -2, 1, -2),
+                    ZIndex = 301,
+                    Parent = Outer,
+                })
+                Library:AddToRegistry(AccentFrame, { BackgroundColor3 = 'AccentColor' })
+
+                local Inner = Library:Create('Frame', {
+                    Name = name .. 'Inner',
+                    BackgroundColor3 = Color3.fromRGB(8, 8, 12),
+                    BorderSizePixel = 0,
+                    Position = UDim2.fromOffset(1, 1),
+                    Size = UDim2.new(1, -2, 1, -2),
+                    ZIndex = 302,
+                    Parent = AccentFrame,
+                })
+
+                local GradientOverlay = Library:Create('Frame', {
+                    Name = name .. 'Gradient',
+                    BackgroundColor3 = Color3.new(1, 1, 1),
+                    BorderSizePixel = 0,
+                    Size = UDim2.fromScale(1, 1),
+                    ZIndex = 303,
+                    Parent = Inner,
+                })
+                Library:Create('UIGradient', {
+                    Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 0.90),
+                        NumberSequenceKeypoint.new(1, 1.0),
+                    }),
+                    Rotation = 90,
+                    Parent = GradientOverlay,
+                })
+
+                local Btn = Library:Create('TextButton', {
+                    Name = name .. 'Btn',
+                    BackgroundTransparency = 1,
+                    Size = UDim2.fromScale(1, 1),
+                    Font = Library.Font,
+                    Text = text,
+                    TextColor3 = Color3.fromRGB(255, 255, 255),
+                    TextSize = 13,
+                    AutoButtonColor = false,
+                    ZIndex = 304,
+                    Parent = Inner,
+                    Active = true,
+                })
+
+                return Outer, Btn, AccentFrame
             end
 
-            -- Top-left stack: Toggle UI on top, Lock UI under it
-            Window.MobileToggleUI = makeMobileToggle('Toggle UI', UDim2.fromOffset(12, 12), true, function(on)
-                if on then
-                    if not Toggled then task.spawn(Library.Toggle) end
-                else
-                    if Toggled then task.spawn(Library.Toggle) end
-                end
+            local ToggleOuter, ToggleBtn = CreateMobileButton(
+                'Toggle',
+                'Toggle UI',
+                UDim2.fromOffset(10, 10)
+            )
+            local LockOuter, LockBtn = CreateMobileButton(
+                'Lock',
+                'Unlock UI',
+                UDim2.fromOffset(10, 10 + BTN_H + (BTN_GAP - BTN_H))
+            )
+
+            local IsUnlocked = false
+
+            local function BindMobileButtonAction(Btn, Outer, ClickAction)
+                local dragging = false
+                local dragInput = nil
+                local dragStart = nil
+                local startPos = nil
+                local hasMoved = false
+
+                Btn.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1
+                        or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        hasMoved = false
+                        dragStart = input.Position
+                        startPos = Outer.Position
+                        dragInput = input
+
+                        local connection
+                        connection = input.Changed:Connect(function()
+                            if input.UserInputState == Enum.UserInputState.End then
+                                dragging = false
+                                connection:Disconnect()
+                                if not hasMoved then
+                                    ClickAction()
+                                end
+                            end
+                        end)
+                    end
+                end)
+
+                InputService.InputChanged:Connect(function(input)
+                    if input == dragInput and dragging then
+                        local delta = input.Position - dragStart
+                        if delta.Magnitude > 3 then
+                            hasMoved = true
+                        end
+                        if IsUnlocked and hasMoved then
+                            Outer.Position = UDim2.new(
+                                startPos.X.Scale, startPos.X.Offset + delta.X,
+                                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                            )
+                        end
+                    end
+                end)
+            end
+
+            BindMobileButtonAction(ToggleBtn, ToggleOuter, function()
+                task.spawn(Library.Toggle)
             end)
 
-            Window.MobileLockUI = makeMobileToggle('Lock UI', UDim2.fromOffset(12, 44), false, function(on)
-                Library.UILocked = on
+            BindMobileButtonAction(LockBtn, LockOuter, function()
+                IsUnlocked = not IsUnlocked
+                -- Unlock UI = mobile buttons can be moved; also unlocks main window drag
+                Library.UILocked = not IsUnlocked
+                LockBtn.Text = IsUnlocked and 'Lock UI' or 'Unlock UI'
+                LockBtn.TextColor3 = IsUnlocked and Library.AccentColor or Color3.fromRGB(255, 255, 255)
             end)
+
+            Window.MobileToggleUI = ToggleOuter
+            Window.MobileLockUI = LockOuter
         end
     end
 

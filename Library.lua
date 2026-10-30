@@ -3695,41 +3695,25 @@ function Library:CreateWindow(...)
 
     Window.Holder = Outer;
 
-    -- Mobile-only: Toggle UI + Lock UI
+    -- Mobile-only: Toggle UI stacked above Lock UI (top-left, no bar frame)
     do
-        -- Show only on touch devices (phones / tablets)
         local isMobile = InputService.TouchEnabled == true
 
         if isMobile then
-            local MobileBar = Library:Create('Frame', {
-                AnchorPoint = Vector2.new(0.5, 0);
-                BackgroundColor3 = Library.MainColor;
-                BorderColor3 = Library.OutlineColor;
-                Position = UDim2.new(0.5, 0, 0, 8);
-                Size = UDim2.fromOffset(220, 36);
-                ZIndex = 100;
-                Active = true;
-                Parent = ScreenGui;
-            });
-            Library:AddToRegistry(MobileBar, {
-                BackgroundColor3 = 'MainColor';
-                BorderColor3 = 'OutlineColor';
-            });
-
-            local function makeMobileToggle(text, order, defaultOn, callback)
+            local function makeMobileToggle(text, position, defaultOn, callback)
                 local btn = Library:Create('TextButton', {
                     BackgroundColor3 = defaultOn and Library.AccentColor or Library.BackgroundColor;
                     BorderColor3 = Library.OutlineColor;
-                    Size = UDim2.new(0.5, -6, 1, -8);
-                    Position = UDim2.new(order * 0.5, order == 0 and 4 or 2, 0, 4);
+                    Position = position;
+                    Size = UDim2.fromOffset(100, 28);
                     Text = text;
                     Font = Library.Font;
                     TextSize = 13;
                     TextColor3 = Library.FontColor;
                     AutoButtonColor = false;
                     Active = true;
-                    ZIndex = 101;
-                    Parent = MobileBar;
+                    ZIndex = 100;
+                    Parent = ScreenGui;
                 });
                 Library:AddToRegistry(btn, {
                     BackgroundColor3 = defaultOn and 'AccentColor' or 'BackgroundColor';
@@ -3737,40 +3721,30 @@ function Library:CreateWindow(...)
                     TextColor3 = 'FontColor';
                 });
                 local on = defaultOn
-                local function setVisual()
+                BindClick(btn, function()
+                    on = not on
                     btn.BackgroundColor3 = on and Library.AccentColor or Library.BackgroundColor
                     local reg = Library.RegistryMap[btn]
                     if reg then
                         reg.Properties.BackgroundColor3 = on and 'AccentColor' or 'BackgroundColor'
                     end
-                end
-                BindClick(btn, function()
-                    on = not on
-                    setVisual()
                     callback(on)
                 end)
                 return btn
             end
 
-            -- Toggle UI: when on UI is visible; off hides main window
-            makeMobileToggle('Toggle UI', 0, true, function(on)
+            -- Top-left stack: Toggle UI on top, Lock UI under it
+            Window.MobileToggleUI = makeMobileToggle('Toggle UI', UDim2.fromOffset(12, 12), true, function(on)
                 if on then
-                    if not Toggled then
-                        task.spawn(Library.Toggle)
-                    end
+                    if not Toggled then task.spawn(Library.Toggle) end
                 else
-                    if Toggled then
-                        task.spawn(Library.Toggle)
-                    end
+                    if Toggled then task.spawn(Library.Toggle) end
                 end
             end)
 
-            -- Lock UI: prevent dragging
-            makeMobileToggle('Lock UI', 1, false, function(on)
+            Window.MobileLockUI = makeMobileToggle('Lock UI', UDim2.fromOffset(12, 44), false, function(on)
                 Library.UILocked = on
             end)
-
-            Window.MobileBar = MobileBar
         end
     end
 
